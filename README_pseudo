@@ -1,0 +1,15 @@
+Instructions for Data Analysis Scripts:
+
+Each individual subject's data .csv output from the experiment should be saved into a unique subject folder
+that is named according to the 2-digit subject number (e.g., '07' or '25')
+
+Place the do_bias_indiv.R script into each subject folder, as this script contains code to clean only the contents of an individual subject's data output. 
+
+Run the do_bias_indiv.R script in each subject's folder to create a bias_data dataframe to be saved out within the subject's folder
+
+*NOTE* For studies with a large number of subjects, this can be a rather inefficient system, if left until the end of data collection. This is how my advisor prefers that I construct my data pipeline in his lab, and we run the data cleaning script as data in coming in.
+
+The do_bias_grand loads all of the bias_data dataframes (i.e., do_bias_indiv output) and concatenates them into a single dataframe that can be used for statistical analysis. Therefore, only subject data that has been cleaned using the do_bias_indiv script should be included in the 'subs' vector at the beginning of the do_bias_grand script.
+
+*DISCLAIMER* I am aware that the current inferential statistics tests included at the end of my
+do_bias_grand script may not be the best way to analyze the data. I also think the data may need to be reorganized/cleaned in a different way to suit more advanced statistical analyses. I am in the processes of working with my advisor to understand the best way to calculate "bias" and the relevant statistical comparisons that we will be using. I hope to include these more advanced statistical tests in the final version of my pipeline that is to be submitted at the conclusion of the term. I hope you will keep this in mind when grading the current pseudocode submission. 

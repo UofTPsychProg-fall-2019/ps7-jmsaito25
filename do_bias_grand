@@ -1,0 +1,51 @@
+# Grand Bias Data Computation ---------------------------------------------
+
+# In this script, we concatenate all of the individual summary statistics outputted as dataframes from 
+# do_bias_indiv into a single dataframe that we can use to perform inferential statistics
+
+# To work properly, this script should be placed in a 'grand' folder that is in the same file as the 
+# individual data folders
+
+subs = #{list the subject numbers to include, with 'avg' at the end}
+
+# The above is not very elegant, but it is what we use in our lab
+
+# Concatenate individual data into grand data file ----------------------------------------------------
+
+for (sub in length(subs)) {
+  if (sub < length(subs)) { #This will perform on all values in subs vector EXCEPT the avg row at the end
+    current_sub = subs[sub]
+    setwd("..") #This is why you want to organize your files according to line 7-8
+    setwd(paste(getwd(), current_sub, sep='')) #Opens the individual subject folder
+    current_data = load("bias_data") #Loads individual subject dataframe
+    grand_bias_data[sub,1] <- current_data[1] #baseline_auc
+    grand_bias_data[sub,2] <- current_data[2] #highsim_auc
+    grand_bias_data[sub,3] <- current_data[3] #medsim_auc
+    grand_bias_data[sub,4] <- current_data[4] #lowsim_auc
+    grand_bias_data[sub,5] <- current_data[5] #baseline_conf_prop
+    grand_bias_data[sub,6] <- current_data[6] #highsim_conf_prop
+    grand_bias_data[sub,7] <- current_data[7] #medsim_conf_prop
+    grand_bias_data[sub,8] <- current_data[8] #low_conf_prop
+  } else if (sub == length(subs)) {
+    setwd("..") #Exit individual data folder
+    setwd(paste(getwd(), '/grand', sep = '')) #Enter grand folder
+    grand_bias_data[sub,1:8] <- apply(grand_bias_data[1:8],MARGIN = 2, mean) #Calculate the mean of each variable and append it to the last row in the column
+  }
+}
+
+# Perform Inferential Statistics ------------------------------------------
+
+# To determine the presence of bias in the distribution of responses, we perform a independent samples 
+# t-test to determine if the mean AUC for each bias condition (high/med/low) is significantly different
+# from the mean AUC of the baseline condition
+
+t.test(grand_bias_data[,1], grand_bias_data[,2], paired=TRUE, conf.level=0.95) #High Sim vs Baseline
+t.test(grand_bias_data[,1], grand_bias_data[,3], paired=TRUE, conf.level=0.95) #Medium Sim vs Baseline
+t.test(grand_bias_data[,1], grand_bias_data[,4], paired=TRUE, conf.level=0.95) #Low Sim vs Baseline
+
+# To determine if participants are aware of the biasing effect of recognition, we compare the proportion of
+# high confidence response trials in each bias condition (high/med/low) to that of baseline
+
+t.test(grand_bias_data[,5], grand_bias_data[,6], paired=TRUE, conf.level=0.95) #High Sim vs Baseline
+t.test(grand_bias_data[,5], grand_bias_data[,7], paired=TRUE, conf.level=0.95) #Medium Sim vs Baseline
+t.test(grand_bias_data[,5], grand_bias_data[,8], paired=TRUE, conf.level=0.95) #Low Sim vs Baseline

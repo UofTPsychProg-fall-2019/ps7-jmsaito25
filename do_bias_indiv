@@ -1,0 +1,216 @@
+# Individual Data Clean ---------------------------------------------------
+
+# The raw data from this experiment (recognition-induced memory biases) consists of the following variables:
+# trial - Trials numbered 1-200
+# targ_color - a degree (/360) that confers the specific hue presented as the target that was to be remembered
+# probe_type - whether the recognition hue was highly similar (1), moderately similar (2), dissimilar (3), or not present/baseline (0)
+# probe_dir - the canonical direction in circular color space that the probe was sampled from; 0 control, 1 clockwise, 2 counterclockwise
+# probe_offset - the # of degrees away from the target that the probe color was
+# probe_color - a degree (/360) that confers the specific hue presented as the recognition probe
+# probe_response - whether the participant identified the probe as similar (1) or dissimilar (0), or if the probe was not present ("baseline")
+# recall_response - a degree (/360) that confers the specific hue that the participant recalled and reported during test
+# recall_confidence - confidence in final recall response; 1: high 2: somewhat, 3: guess
+
+# From these parameters, we will calculate the following INDIVIDUAL measures:
+# The proportion of high-confidence responses for each bias condition (control/bias)
+# The area under the curve for the bias function (explained in code)
+
+# Load Data ---------------------------------------------------------------
+
+setwd(file.choose()) #file.choose() will provide GUI to enter path; select relevant data .csv
+current_directory <- getwd() #Set variable with current directory
+sub <- substr(current_directory, nchar(current_directory)-1, nchar(current_directory)) #Grab subject number from current directory
+filename <- paste('indiv_rimb_',sub,'.csv', sep='') #Use subject number to load individual data file
+data <- read.csv(filename) #Read in data file
+
+# Calculate Response Offset for Final Recall ------------------------------
+
+# Here we calculate the offset of participants' final recall response relative to what was 
+# displayed originally for them to remember (e.g., -30) offset means the response was 30 
+# degree counterclockwise to the original target
+
+data$recall_resp_offset <- data$targ_color - data$recall_response #Calculate raw response offset from target
+recall_offsets <- as.numeric(data$recall_resp_offset) #Assign response offsets to variable for looping
+
+# Bound offsets (-180 < x < 180) for symmetrical visualization and for simplified analysis later on
+for (x in 1:length(recall_offsets)) {
+  if (recall_offsets[x] >= 180) {
+    recall_offsets[x] <- recall_offsets[x] - 360
+  } else if (recall_offsets[x] < -180) {
+    recall_offsets[x] <- recall_offsets[x] + 360
+  }
+}
+
+# Reassign bound offsets back to data frame
+data$recall_resp_offset <- recall_offsets
+
+# Bin Offset Based on Probe Similarity + Direction + Good Response ------------------------------------------
+
+# Here we bin offsets based on what probe type (similarity level) was shown, what direction the
+# probe was offset (clockwise/counterclockwise), & whether or not a response was made to the recognition probe
+
+# Together, these binned trials will represent the "good" trials that can be included in subsequent data analysis
+
+#NOTE: Participants do not view a recognition probe in baseline trials. However, in order to perform subsequent 
+# analyses, we will "assign" a probe direction using a counter in the for loop
+
+#Start by initializing open vectors to be updated in for loop
+good_baseline_CW_trials <- vector()
+good_baseline_CCW_trials <- vector()
+good_highsim_CW_trials <- vector()
+good_highsim_CCW_trials <- vector()
+good_medsim_CW_trials <- vector()
+good_medsim_CCW_trials <- vector()
+good_lowsim_CW_trials <- vector()
+good_lowsim_CCW_trials <- vector()
+
+# Assign probe details to separate variables for looping
+probe_types <- as.numeric(data$probe_type)
+probe_response <- data$probe_response
+probe_dir <- as.numeric(data$probe_dir)
+
+#Loop through trials and bin trials based on their respective components
+counter = 1
+for (trial in 1:length(probe_types)) {
+  if (probe_types[trial] == 0 && counter %% 2 == 1) {
+    append(good_baseline_CW_trials, trial) #Baseline CW
+    counter = counter + 1
+  } else if (probe_types[trial] == 0 && counter %% 2 == 0) {
+    append(good_baseline_CCW_trials, trial) #Baseline CCW
+    counter = counter + 1
+  } else if (probe_types[trial] == 1 && probe_dir[trial] == 1 && probe_response[trial] != 'none') {
+    append(good_highsim_CW_trials, trial) # High Similarity CW
+  } else if (probe_types[trial] == 1 && probe_dir[trial] == 2 && probe_response[trial] != 'none') {
+    append(good_highsim_CCW_trials, trial) # High Similarity CCW
+  } else if (probe_types[trial] == 2 && probe_dir[trial] == 1 && probe_response[trial] != 'none') {
+    append(good_medsim_CW_trials, trial) # Medium Similarity CW
+  } else if (probe_types[trial] == 2 && probe_dir[trial] == 2 && probe_response[trial] != 'none') {
+    append(good_medsim_CCW_trials, trial) # Medium Similarity CCW
+  } else if (probe_types[trial] == 3 && probe_dir[trial] == 1 && probe_response[trial] != 'none') {
+    append(good_lowsim_CW_trials, trial) # Low Similarity CW
+  } else if (probe_types[trial] == 3 && probe_dir[trial] == 2 && probe_response[trial] != 'none') {
+    append(good_lowsim_CCW_trials, trial) # Low Similarity CCW
+  }
+}
+    
+# Now we have indexes for good trials that are binned based on the probe similarity & offset direction
+# We will collapse across CW & CCW trials in order to increase the number of trials that will be included
+# in our subsequent analyses
+
+# First we need to index the recall offsets using our binned trial vectors
+baseline_CW_offsets <- recall_offsets[good_baseline_CW_trials]
+baseline_CCW_offsets <- recall_offsets[good_baseline_CCW_trials]
+highsim_CW_offsets <- recall_offsets[good_highsim_CW_trials]
+highsim_CCW_offsets <- recall_offsets[good_highsim_CCW_trials]
+medsim_CW_offsets <- recall_offsets[good_medsim_CW_trials]
+medsim_CCW_offsets <- recall_offsets[good_medsim_CCW_trials]
+lowsim_CW_offsets <- recall_offsets[good_lowsim_CW_trials]
+lowsim_CCW_offsets <- recall_offsets[good_lowsim_CCW_trials]
+
+# Now multiply CCW offsets by -1 and combine the CW & CCW vectors 
+baseline_offset_collapsed <- c(baseline_CW_offsets, -1*baseline_CCW_offsets)
+highsim_offset_collapsed <- c(highsim_CW_offsets, -1*highsim_CCW_offsets)
+medsim_offset_collapsed <- c(medsim_CW_offsets, -1*medsim_CCW_offsets)
+lowsim_offset_collapsed <- c(lowsim_CW_offsets, -1*lowsim_CCW_offsets)
+
+#At this point, we have cleaned the data. We can perform all relevant summarizing statistics on the data
+
+
+# Quantify the Bias for Each Distribution ---------------------------------
+
+# Calculate the asymmetry in the distribution of recognition responses across 0 degrees 
+# (0 - 180 = towards recognition probe; -180 - 0 = away from recognition probe)
+
+# Initialize vectors to be updated during for loop
+baseline_bias_count <- vector()
+highsim_bias_count <- vector()
+medsim_bias_count <- vector()
+lowsim_bias_count <- vector()
+
+# In the for loop, we will (1) count the number of positive & negative offsets for each degree
+# and then we will (2) subtract the positive counts from the negative counts to compute the raw number
+# responses biased towards the recognition probe relative to away from it, since we are hypothesizing an
+# attraction bias
+
+for (angle in 1:180) {
+  pos_count_base <- (sum(baseline_offset_collapsed == angle))
+  neg_count_base <- (sum(baseline_offset_collapsed == -1*angle))
+  pos_count_hsim <- (sum(highsim_offset_collapsed == angle))
+  neg_count_hsim <- (sum(highsim_offset_collapsed == -1*angle))
+  pos_count_msim <- (sum(medsim_offset_collapsed == angle))
+  neg_count_msim <- (sum(medsim_offset_collapsed == -1*angle))
+  pos_count_lsim <- (sum(lowsim_offset_collapsed == angle))
+  neg_count_lsim <- (sum(lowsim_offset_collapsed == -1*angle))
+  
+  baseline_bias_count[angle] <- (pos_count_base - neg_count_base)
+  highsim_bias_count[angle] <- (pos_count_hsim - neg_count_hsim)
+  medsim_bias_count[angle] <- (pos_count_msim - neg_count_msim)
+  lowsim_bias_count[angle] <- (pos_count_lsim - neg_count_lsim)
+}
+
+# Now we quantify the bias by calculating the area under the curve for each condition using trapezoidal integration
+
+baseline_auc <- trapz(baseline_bias_count)
+highsim_auc <- trapz(highsim_bias_count)
+medsim_auc <- trapz(medsim_bias_count)
+lowsim_auc <- trapz(lowsim_bias_count)
+
+# Quantify the Proportion of High Confidence Response Trials --------------
+
+# First we need to create an index of the number of trials where participants reported 
+# high confidence 
+
+#Total Trial counters
+baseline_count = 0
+highsim_count = 0
+medsim_count= 0
+lowsim_count= 0
+#High Confidence counters
+baseline_conf_count = 0
+highsim_conf_count = 0
+medsim_conf_count = 0
+lowsim_conf_count = 0
+
+recall_confidence <- as.numeric(data$recall_confidence)
+
+#Calculate number of good trials per condition to be used as "total trials" in denominator
+
+for (trial in 1:length(recall_confidence)) {
+  if (probe_types[trial] == 0 && probe_response[trials] != 'none') {
+    baseline_count = baseline_count + 1
+  } else if (probe_types[trial] == 1 && probe_response[trials] != 'none') {
+    highsim_count = highsim_count + 1
+  } else if (probe_types[trial] == 2 && probe_response[trials] != 'none') {
+    medsim_count = medsim_count + 1
+  } else if (probe_types[trial] == 3 && probe_response[trials] != 'none') {
+    lowsim_count = lowsim_count + 1
+  } 
+}
+  
+#Calculate number of high confidence trials per condition to be used in numerator
+for (trial in 1:length(recall_confidence)) {
+  if (probe_types[trial] == 0 && recall_confidence == 1 && probe_response[trial] != 'none') {
+    baseline_conf_count = baseline_conf_count + 1
+  } else if (probe_types[trial] == 1 && recall_confidence == 1 && probe_response[trial] != 'none') {
+    highsim_conf_count = highsim_conf_count + 1
+  } else if (probe_types[trial] == 2 && recall_confidence == 1 && probe_response[trial] != 'none') {
+    medsim_conf_count = medsim_conf_count + 1
+  } else if (probe_types[trial] == 3 && recall_confidence == 1 && probe_response[trial] != 'none') {
+    medsim_conf_count = medsim_conf_count + 1
+  }
+}
+
+#Calculate high confidence proportions and assign to variables
+baseline_conf_prop <- baseline_conf_count/baseline_count
+highsim_conf_prop <- highsim_conf_count/highsim_count
+medsim_conf_prop <- medsim_conf_count/medsim_count
+lowsim_conf_prop <- lowsim_conf_count/lowsim_count
+
+# Concatenate and Save ----------------------------------------------------
+
+bias_data <- as.data.frame(c(baseline_auc, highsim_auc, medsim_auc, lowsim_auc, baseline_conf_prop, highsim_conf_prop,
+               medsim_conf_prop, lowsim_conf_prop))
+
+save(bias_data, file = 'bias_data')
+
+# This bias_data dataframe will be imported and concatenated across subjects in the Grand script 
